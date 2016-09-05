@@ -10,6 +10,10 @@ from slam_b_library import filter_step
 from slam_04_a_project_landmarks import\
      compute_scanner_cylinders, write_cylinders
 from math import sqrt, atan2
+import numpy as np
+
+def distance(p0, p1):
+    return sqrt((p0[0] - p1[0])**2 + (p0[1] - p1[1])**2)
 
 # Given a list of cylinders (points) and reference_cylinders:
 # For every cylinder, find the closest reference_cylinder and add
@@ -19,8 +23,23 @@ from math import sqrt, atan2
 def find_cylinder_pairs(cylinders, reference_cylinders, max_radius):
     cylinder_pairs = []
 
-    # --->>> Insert your previous solution here.
-
+    # --->>> Enter your code here.
+    # Make a loop over all cylinders and reference_cylinders.
+    # In the loop, if cylinders[i] is closest to reference_cylinders[j],
+    # and their distance is below max_radius, then add the
+    # tuple (i,j) to cylinder_pairs, i.e., cylinder_pairs.append( (i,j) ).
+    for i in range(len(cylinders)):
+        min_dist = max_radius
+        closest_cyl = []
+        for j in range(len(reference_cylinders)):
+            dist = distance(cylinders[i],reference_cylinders[j])
+            if dist < max_radius and dist < min_dist:
+                min_dist = dist
+                closest_cyl = j
+        
+        if not closest_cyl == []:
+            cylinder_pairs.append((i,closest_cyl))
+    
     return cylinder_pairs
 
 # Given a point list, return the center of mass.
@@ -41,11 +60,53 @@ def compute_center(point_list):
 # i.e., the rotation angle is not given in radians, but rather in terms
 # of the cosine and sine.
 def estimate_transform(left_list, right_list, fix_scale = False):
+
+    if len(left_list) < 2 or len(right_list) < 2:
+        return None
+
     # Compute left and right center.
     lc = compute_center(left_list)
     rc = compute_center(right_list)
 
-    # --->>> Insert your previous solution here.
+    l_i = [tuple(np.subtract(l,lc)) for l in left_list]
+    r_i = [tuple(np.subtract(r,rc)) for r in right_list]
+
+    # print l_i
+    # print r_i
+
+    cs,ss,rr,ll = 0.0,0.0,0.0,0.0
+
+    for i in range(len(left_list)):
+        cs += (r_i[i][0] * l_i[i][0]) + (r_i[i][1] * l_i[i][1])
+        ss += -(r_i[i][0] * l_i[i][1]) + (r_i[i][1] * l_i[i][0])
+        #rr += (right_list[i][0] * right_list[i][0]) + (right_list[i][1] * right_list[i][1])
+        #ll += (left_list[i][0] * left_list[i][0]) + (left_list[i][1] * left_list[i][1])
+        rr += (r_i[i][0] * r_i[i][0]) + (r_i[i][1] * r_i[i][1])
+        ll += (l_i[i][0] * l_i[i][0]) + (l_i[i][1] * l_i[i][1])
+
+
+    #print cs, ss, rr, ll
+
+    if rr == 0.0 or ll == 0.0:
+        return None
+
+    if fix_scale:
+        la = 1.0
+    else:
+        la = sqrt(rr/ll)
+
+    if cs == 0.0 or ss == 0.0:
+        #c = 0.0
+        #s = 0.0
+        return None
+    else:
+        c = cs / sqrt((cs*cs) + (ss*ss))
+        s = ss / sqrt((cs*cs) + (ss*ss))
+
+    tx = rc[0] - (la * ((c * lc[0]) - (s * lc[1])))
+    ty = rc[1] - (la * ((s * lc[0]) + (c * lc[1])))
+
+    # --->>> Insert here your code to compute lambda, c, s and tx, ty.
 
     return la, c, s, tx, ty
 
@@ -64,11 +125,17 @@ def apply_transform(trafo, p):
 # similarity transform. Note this changes the position as well as
 # the heading.
 def correct_pose(pose, trafo):
-    
-    # --->>> This is what you'll have to implement.
-
-    return (pose[0], pose[1], pose[2])  # Replace this by the corrected pose.
-
+    la, c, s, tx, ty = trafo
+    #print 'trafo:', trafo
+    old_x = pose[0]
+    old_y = pose[1]
+    old_theta = pose[2]
+    #print 'pose: ', pose
+    x, y = apply_transform( trafo, (old_x,old_y) )
+    theta = old_theta + atan2(s,c)
+    #print 'new pose: ', (x,y,theta)
+    return (x, y, theta)  # Replace this by the corrected pose.
+    #return(old_x,old_y,theta)
 
 if __name__ == '__main__':
     # The constants we used for the filter_step.

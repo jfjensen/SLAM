@@ -60,6 +60,10 @@ def compute_center(point_list):
 # i.e., the rotation angle is not given in radians, but rather in terms
 # of the cosine and sine.
 def estimate_transform(left_list, right_list, fix_scale = False):
+    
+    if len(left_list) < 2 or len(right_list) < 2:
+        return None
+
     # Compute left and right center.
     lc = compute_center(left_list)
     rc = compute_center(right_list)
@@ -75,10 +79,13 @@ def estimate_transform(left_list, right_list, fix_scale = False):
     for i in range(len(left_list)):
         cs += (r_i[i][0] * l_i[i][0]) + (r_i[i][1] * l_i[i][1])
         ss += -(r_i[i][0] * l_i[i][1]) + (r_i[i][1] * l_i[i][0])
-        rr += (right_list[i][0] * right_list[i][0]) + (right_list[i][1] * right_list[i][1])
-        ll += (left_list[i][0] * left_list[i][0]) + (left_list[i][1] * left_list[i][1])
+        #rr += (right_list[i][0] * right_list[i][0]) + (right_list[i][1] * right_list[i][1])
+        #ll += (left_list[i][0] * left_list[i][0]) + (left_list[i][1] * left_list[i][1])
+        rr += (r_i[i][0] * r_i[i][0]) + (r_i[i][1] * r_i[i][1])
+        ll += (l_i[i][0] * l_i[i][0]) + (l_i[i][1] * l_i[i][1])
 
-    print cs, ss, rr, ll
+
+    #print cs, ss, rr, ll
 
     if rr == 0.0 or ll == 0.0:
         return None
@@ -86,17 +93,19 @@ def estimate_transform(left_list, right_list, fix_scale = False):
     if fix_scale:
         la = 1.0
     else:
-        la = sqrt(ll/rr)
+        la = sqrt(rr/ll)
 
     if cs == 0.0 or ss == 0.0:
-        c = 0.0
-        s = 0.0
+        #c = 0.0
+        #s = 0.0
+        return None
     else:
         c = cs / sqrt((cs*cs) + (ss*ss))
         s = ss / sqrt((cs*cs) + (ss*ss))
 
-    tx = rc[0] - la * (c * lc[0] - s * lc[1])
-    ty = rc[1] - la * (s * lc[0] + c * lc[1])
+    tx = rc[0] - (la * ((c * lc[0]) - (s * lc[1])))
+    ty = rc[1] - (la * ((s * lc[0]) + (c * lc[1])))
+
 
     # --->>> Insert here your code to compute lambda, c, s and tx, ty.
 

@@ -9,9 +9,9 @@ from lego_robot import *
 from slam_b_library import\
      filter_step, concatenate_transform
 from slam_04_a_project_landmarks import write_cylinders
-from slam_04_d_apply_transform_solution import\
+from slam_04_d_apply_transform_question import\
      estimate_transform, apply_transform, correct_pose
-from slam_05_a_find_wall_pairs_solution import\
+from slam_05_a_find_wall_pairs_question import\
      get_subsampled_points, get_corresponding_points_on_wall
 
 # ICP: Iterate the steps of transforming the points, selecting point pairs, and
@@ -24,16 +24,30 @@ def get_icp_transform(world_points, iterations):
     
     # You may use the following strategy:
     # Start with the identity transform:
-    #   overall_trafo = (1.0, 1.0, 0.0, 0.0, 0.0)
-    # Then loop for j in xrange(iterations):
+    overall_trafo = (1.0, 1.0, 0.0, 0.0, 0.0)
+    # Then loop 
+    for j in xrange(iterations):
+    #for j in xrange(5):
+        #print 'iteration: ',j
     #   Transform the world_points using the curent overall_trafo
     #     (see 05_b on how to do this)
+        
+        world_points = [apply_transform(overall_trafo, p) for p in world_points]
+        
     #   Call get_correspoinding_points_on_wall(...)
+        left, right = get_corresponding_points_on_wall(world_points)
+        
     #   Determine transformation which is needed "on top of" the current
     #     overall_trafo: trafo = estimate_transform(...)
+        trafo = estimate_transform(left, right, fix_scale = True)    
+        
     #   Concatenate the found transformation with the current overall_trafo
     #     to obtain a new, 'combined' transformation. You may use the function
-    #     overall_trafo = concatenate_transform(trafo, overall_trafo)
+        if trafo:
+            overall_trafo = concatenate_transform(trafo, overall_trafo)
+
+        else:
+            overall_trafo = (1.0, 1.0, 0.0, 0.0, 0.0)
     #     to concatenate two similarities.
     #   Note also that estimate_transform may return None.
     # 

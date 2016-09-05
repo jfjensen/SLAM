@@ -6,9 +6,9 @@
 from lego_robot import *
 from slam_b_library import filter_step
 from slam_04_a_project_landmarks import write_cylinders
-from slam_04_d_apply_transform_solution import\
+from slam_04_d_apply_transform_question import\
      estimate_transform, apply_transform, correct_pose
-from slam_05_a_find_wall_pairs_solution import\
+from slam_05_a_find_wall_pairs_question import\
      get_subsampled_points, get_corresponding_points_on_wall
 
 
