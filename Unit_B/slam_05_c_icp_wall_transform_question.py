@@ -27,15 +27,15 @@ def get_icp_transform(world_points, iterations):
     overall_trafo = (1.0, 1.0, 0.0, 0.0, 0.0)
     # Then loop 
     for j in xrange(iterations):
-    #for j in xrange(5):
+    #for j in xrange(3):
         #print 'iteration: ',j
     #   Transform the world_points using the curent overall_trafo
     #     (see 05_b on how to do this)
         
-        world_points = [apply_transform(overall_trafo, p) for p in world_points]
+        world_points_tr = [apply_transform(overall_trafo, p) for p in world_points]
         
     #   Call get_correspoinding_points_on_wall(...)
-        left, right = get_corresponding_points_on_wall(world_points)
+        left, right = get_corresponding_points_on_wall(world_points_tr)
         
     #   Determine transformation which is needed "on top of" the current
     #     overall_trafo: trafo = estimate_transform(...)
