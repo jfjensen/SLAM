@@ -218,27 +218,43 @@ class ExtendedKalmanFilter:
         #
         # You will have to compute:
         # H, using dh_dstate(...).
+        Ht = self.dh_dstate( self.state, landmark, self.scanner_displacement )
+        HtT =  Ht.T
+
         # Q, a diagonal matrix, from self.measurement_distance_stddev and
         #  self.measurement_angle_stddev (remember: Q contains variances).
+        g1 = (self.measurement_distance_stddev)**2
+        g2 = (self.measurement_angle_stddev)**2
+        Q = diag([ g1, g2 ])
+        
         # K, from self.covariance, H, and Q.
+        Sigma_t = self.covariance
+        Kt =  dot(Sigma_t, dot(HtT, linalg.inv(dot(dot(Ht, Sigma_t), HtT) + Q)))
+
         #  Use linalg.inv(...) to compute the inverse of a matrix.
+        
         # The innovation: it is easy to make an error here, because the
         #  predicted measurement and the actual measurement of theta may have
         #  an offset of +/- 2 pi. So here is a suggestion:
-        #   innovation = array(measurement) -\
-        #                self.h(self.state, landmark, self.scanner_displacement)
-        #   innovation[1] = (innovation[1] + pi) % (2*pi) - pi
+        innovation = array(measurement) - self.h(self.state, landmark, self.scanner_displacement)
+        innovation[1] = (innovation[1] + pi) % (2*pi) - pi
+
         # Then, you'll have to compute the new self.state.
+        mu_t = self.state + dot(Kt, innovation)
+        self.state = mu_t
+
         # And finally, compute the new self.covariance. Use eye(3) to get a 3x3
         #  identity matrix.
-        #
+        self.covariance = dot( (eye(3) - dot(Kt,Ht)), Sigma_t)
+
+
         # Hints:
         # dot(A, B) is the 'normal' matrix product (do not use: A*B).
         # A.T is the transposed of a matrix A (A itself is not modified).
         # linalg.inv(A) returns the inverse of A (A itself is not modified).
         # eye(3) returns a 3x3 identity matrix.
 
-        pass # Remove this.
+        #pass # Remove this.
 
 if __name__ == '__main__':
     # Robot constants.
