@@ -103,18 +103,50 @@ class ExtendedKalmanFilterSLAM:
         V = self.dg_dcontrol(self.state, control, self.robot_width)
         R3 = dot(V, dot(control_covariance, V.T))
 
-        # --->>> Put here your previous code to compute the new
-        #        covariance and state.
+        N = self.number_of_landmarks
+        N2 = N*2
+
+        G = zeros((3+N2,3+N2))
+        G[0:3,0:3] = G3
+        G[3:,3:] = eye(N2)
+
+        R = zeros((3+N2,3+N2))
+        R[0:3,0:3] = R3
+        
+        # Now enlarge G3 and R3 to accomodate all landmarks. Then, compute the
+        # new covariance matrix self.covariance.
+        #self.covariance = dot(G3, dot(self.covariance, G3.T)) + R3  # Replace this.
+        self.covariance = dot(G, dot(self.covariance, G.T)) + R
+        # state' = g(state, control)
+        new_state = self.g(self.state[:3,], control, self.robot_width)
+
+        self.state = hstack((new_state[:,],self.state[3:,]))
+
 
     def add_landmark_to_state(self, initial_coords):
         """Enlarge the current state and covariance matrix to include one more
            landmark, which is given by its initial_coords (an (x, y) tuple).
            Returns the index of the newly added landmark."""
         
-        # --->>> Put here your previous code to augment the robot's state and
-        #        covariance matrix.
+        index = self.number_of_landmarks
+        self.number_of_landmarks +=1
 
-        return -1  # Replace this.
+        x1, y1 = initial_coords
+        new_landmark = array([x1,y1])
+
+        dim_x,dim_y = self.covariance.shape
+        new_matrix = zeros((dim_x+2,dim_y+2))
+
+        new_matrix[0:dim_x,0:dim_y] = self.covariance
+        new_matrix[dim_x:,dim_y:] = diag([10**10,10**10])
+        
+        self.covariance = new_matrix
+        #print self.state
+        new_state = hstack((self.state[:,], new_landmark[:,]))
+        self.state = new_state
+        #print self.state
+
+        return index 
 
     @staticmethod
     def h(state, landmark, scanner_displacement):
@@ -152,7 +184,12 @@ class ExtendedKalmanFilterSLAM:
         H3 = self.dh_dstate(self.state, landmark, self.scanner_displacement)
 
         # --->>> Add your code here to set up the full H matrix.
-        H = H3  # Replace this.
+        N = self.number_of_landmarks
+        new_H = zeros((2,3+2*N))
+        new_H[0:2,0:3] = H3
+        new_H[0:2, 3+2*landmark_index : 3+2*landmark_index+2] = new_H[0:2,0:2]*-1
+
+        H = new_H  
 
         # This is the old code from the EKF - no modification necessary!
         Q = diag([self.measurement_distance_stddev**2,
@@ -203,6 +240,7 @@ if __name__ == '__main__':
     depth_jump = 100.0
     cylinder_offset = 90.0
     max_cylinder_distance = 500.0
+    #max_cylinder_distance = 800.0
 
     # Filter constants.
     control_motion_factor = 0.35  # Error in motor control.

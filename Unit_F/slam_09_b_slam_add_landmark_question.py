@@ -28,6 +28,9 @@ class ExtendedKalmanFilterSLAM:
     @staticmethod
     def g(state, control, w):
         x, y, theta = state
+        # x = state[0]
+        # y = state[1]
+        # theta = state[2]
         l, r = control
         if r != l:
             alpha = (r - l) / w
@@ -98,9 +101,26 @@ class ExtendedKalmanFilterSLAM:
         control_covariance = diag([left_var, right_var])
         V = self.dg_dcontrol(self.state, control, self.robot_width)
         R3 = dot(V, dot(control_covariance, V.T))
+        #print self.state
+        N = self.number_of_landmarks
+        N2 = N*2
 
-        # --->>> Put here your previous code to compute the new
-        #        covariance and state.
+        G = zeros((3+N2,3+N2))
+        G[0:3,0:3] = G3
+        G[3:,3:] = eye(N2)
+
+        R = zeros((3+N2,3+N2))
+        R[0:3,0:3] = R3
+        
+        # Now enlarge G3 and R3 to accomodate all landmarks. Then, compute the
+        # new covariance matrix self.covariance.
+        #self.covariance = dot(G3, dot(self.covariance, G3.T)) + R3  # Replace this.
+        self.covariance = dot(G, dot(self.covariance, G.T)) + R
+        # state' = g(state, control)
+        new_state = self.g(self.state[:3,], control, self.robot_width)
+
+        self.state = hstack((new_state[:,],self.state[3:,]))
+        #print self.state
 
     def add_landmark_to_state(self, initial_coords):
         """Enlarge the current state and covariance matrix to include one more
@@ -120,11 +140,29 @@ class ExtendedKalmanFilterSLAM:
         # - Do not forget to increment self.number_of_landmarks.
         # - Do not forget to return the index of the newly added landmark. I.e.,
         #   the first call should return 0, the second should return 1.
+        index = self.number_of_landmarks
+        self.number_of_landmarks +=1
 
-        return -1  # Replace this.
+        x1, y1 = initial_coords
+        new_landmark = array([x1,y1])
+
+        dim_x,dim_y = self.covariance.shape
+        new_matrix = zeros((dim_x+2,dim_y+2))
+
+        new_matrix[0:dim_x,0:dim_y] = self.covariance
+        new_matrix[dim_x:,dim_y:] = diag([10**10,10**10])
+        
+        self.covariance = new_matrix
+        #print self.state
+        new_state = hstack((self.state[:,], new_landmark[:,]))
+        self.state = new_state
+        #print self.state
+
+        return index  # Replace this.
 
     def get_landmarks(self):
         """Returns a list of (x, y) tuples of all landmark positions."""
+        #print self.state
         return ([(self.state[3+2*j], self.state[3+2*j+1])
                  for j in xrange(self.number_of_landmarks)])
 
@@ -172,6 +210,9 @@ if __name__ == '__main__':
 
     # Just to test the algorithm, add one landmark.
     kf.add_landmark_to_state((400.0, 700.0))
+    #kf.add_landmark_to_state((700.0, 400.0))
+
+
     # To make the error ellipse visible, set a smaller variance.
     if kf.number_of_landmarks > 0:
         kf.covariance[-2,-2] = 300.0**2  # 300 mm in x.
@@ -188,8 +229,9 @@ if __name__ == '__main__':
     for i in xrange(len(logfile.motor_ticks)):
         # Prediction.
         control = array(logfile.motor_ticks[i]) * ticks_to_mm
+        #print kf.state
         kf.predict(control)
-
+        #print kf.state
         # End of EKF SLAM - from here on, data is written.
 
         # Output the center of the scanner, not the center of the robot.

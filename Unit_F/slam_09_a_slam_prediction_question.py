@@ -109,10 +109,20 @@ class ExtendedKalmanFilterSLAM:
         # - Similarly for vectors: v[1:3] returns the vector consisting of the
         #   elements 1 and 2, but not 3.
         # - All matrix and vector indices start at 0.
+        N = self.number_of_landmarks
+        N2 = N*2
+
+        G = zeros((3+N2,3+N2))
+        G[0:3,0:3] = G3
+        G[3:,3:] = eye(N2)
+
+        R = zeros((3+N2,3+N2))
+        R[0:3,0:3] = R3
 
         # Now enlarge G3 and R3 to accomodate all landmarks. Then, compute the
         # new covariance matrix self.covariance.
-        self.covariance = dot(G3, dot(self.covariance, G3.T)) + R3  # Replace this.
+        #self.covariance = dot(G3, dot(self.covariance, G3.T)) + R3  # Replace this.
+        self.covariance = dot(G, dot(self.covariance, G.T)) + R
         # state' = g(state, control)
         self.state = self.g(self.state, control, self.robot_width)  # Replace this.
 
