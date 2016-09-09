@@ -52,7 +52,7 @@ class Particle:
         """Returns the expected distance and bearing measurement for a given
            landmark number and the pose of this particle."""
         # --->>> Insert your previous code here.
-        return np.array([0.0, 0.0])  # Replace this.
+        return self.h(self.pose,self.landmark_positions[landmark_number], scanner_displacement)
 
     def H_Ql_jacobian_and_measurement_covariance_for_landmark(
         self, landmark_number, Qt_measurement_covariance, scanner_displacement):
@@ -60,8 +60,10 @@ class Particle:
            position and the landmark given by landmark_number. Also computes the
            measurement covariance matrix."""
         # --->>> Insert your previous code here.
-        H = np.eye(2)  # Replace this.
-        Ql = np.eye(2)  # Replace this.
+        H = self.dh_dlandmark(self.pose,self.landmark_positions[landmark_number], scanner_displacement)
+        Sigma_k = self.landmark_covariances[landmark_number]
+        Ql = np.dot(np.dot(H,Sigma_k),H.T) + Qt_measurement_covariance
+        
         return (H, Ql)
 
     def update_landmark(self, landmark_number, measurement,
@@ -71,13 +73,25 @@ class Particle:
         # Hints:
         # - H and Ql can be computed using
         #   H_Ql_jacobian_and_measurement_covariance_for_landmark()
+        H, Ql = self.H_Ql_jacobian_and_measurement_covariance_for_landmark( landmark_number,Qt_measurement_covariance,scanner_displacement )
+        
         # - Use np.linalg.inv(A) to compute the inverse of A
+        Ql_inv = np.linalg.inv(Ql)
+        
         # - Delta z is measurement minus expected measurement
         # - Expected measurement can be computed using
         #   h_expected_measurement_for_landmark()
+        h = self.h_expected_measurement_for_landmark( landmark_number, scanner_displacement )
+        delta_z = measurement - h
+
         # - Remember to update landmark_positions[landmark_number] as well
         #   as landmark_covariances[landmark_number].
-        pass  # Replace this.
+        Sigma_old = self.landmark_covariances[landmark_number]
+        K = np.dot(np.dot(Sigma_old,H.T),Ql_inv)
+        KH = np.dot(K,H)
+        
+        self.landmark_positions[landmark_number] += np.dot(K, delta_z)
+        self.landmark_covariances[landmark_number] = np.dot((np.eye(KH.shape[0]) - KH), Sigma_old)
 
 
 def insert_landmarks(particle):

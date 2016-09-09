@@ -50,11 +50,17 @@ class Particle:
         # - LegoLogfile.scanner_to_world() (from lego_robot.py) will return
         #   the world coordinate, given the scanner pose and the coordinate in
         #   the scanner's system.
+        m = LegoLogfile.scanner_to_world(scanner_pose,measurement_in_scanner_system)
         # - H is obtained from dh_dlandmark()
+        H = self.dh_dlandmark(scanner_pose, m, scanner_displacement)
         # - Use np.linalg.inv(A) to invert matrix A
+        H_inv = np.linalg.inv(H)
+        Qt = Qt_measurement_covariance
         # - As usual, np.dot(A,B) is the matrix product of A and B.
-        self.landmark_positions.append(np.array([0.0, 0.0]))  # Replace this.
-        self.landmark_covariances.append(np.eye(2))  # Replace this.
+        # self.landmark_positions.append(np.array([0.0, 0.0]))  # Replace this.
+        # self.landmark_covariances.append(np.eye(2))  # Replace this.
+        self.landmark_positions.append(m)
+        self.landmark_covariances.append(np.dot(np.dot(H_inv,Qt),H_inv.T))
 
 
 if __name__ == '__main__':

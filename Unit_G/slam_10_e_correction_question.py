@@ -81,16 +81,17 @@ class Particle:
         """Returns the expected distance and bearing measurement for a given
            landmark number and the pose of this particle."""
         # --->>> Insert your previous code here.
-        return np.array([0.0, 0.0])  # Replace this.
+        return self.h(self.pose,self.landmark_positions[landmark_number], scanner_displacement)
 
     def H_Ql_jacobian_and_measurement_covariance_for_landmark(
         self, landmark_number, Qt_measurement_covariance, scanner_displacement):
         """Computes Jacobian H of measurement function at the particle's
            position and the landmark given by landmark_number. Also computes the
            measurement covariance matrix."""
-        # --->>> Insert your previous code here.
-        H = np.eye(2)  # Replace this.
-        Ql = np.eye(2)  # Replace this.
+        H = self.dh_dlandmark(self.pose,self.landmark_positions[landmark_number], scanner_displacement)
+        Sigma_k = self.landmark_covariances[landmark_number]
+        Ql = np.dot(np.dot(H,Sigma_k),H.T) + Qt_measurement_covariance
+        
         return (H, Ql)
 
     def wl_likelihood_of_correspondence(self, measurement,
@@ -99,8 +100,23 @@ class Particle:
                                         scanner_displacement):
         """For a given measurement and landmark_number, returns the likelihood
            that the measurement corresponds to the landmark."""
-        # --->>> Insert your previous code here.
-        return 0.01 # Replace this.
+        # - You will need delta_z, which is the measurement minus the
+        #   expected_measurement_for_landmark()
+        delta_z = measurement - self.h_expected_measurement_for_landmark( landmark_number, scanner_displacement )
+
+        # - Ql is obtained using a call to
+        #   H_Ql_jacobian_and_measurement_covariance_for_landmark(). You
+        #   will only need Ql, not H
+        H,Ql = self.H_Ql_jacobian_and_measurement_covariance_for_landmark( landmark_number,Qt_measurement_covariance,scanner_displacement )
+
+        # - np.linalg.det(A) computes the determinant of A
+        # - np.dot() does not distinguish between row and column vectors.
+        detQl = np.linalg.det(Ql)
+        e_factor = -0.5 * np.dot(np.dot(delta_z.T, np.linalg.inv(Ql)), delta_z)
+        l = exp(e_factor)/(2*pi*sqrt(detQl))
+
+        #return 0.01 # Replace this.
+        return l
 
     def compute_correspondence_likelihoods(self, measurement,
                                            number_of_landmarks,
@@ -124,15 +140,45 @@ class Particle:
         scanner_pose = (self.pose[0] + cos(self.pose[2]) * scanner_displacement,
                         self.pose[1] + sin(self.pose[2]) * scanner_displacement,
                         self.pose[2])
-        # --->>> Insert your previous code here.
-        self.landmark_positions.append(np.array([0.0, 0.0]))  # Replace this.
-        self.landmark_covariances.append(np.eye(2))  # Replace this.
+        # - LegoLogfile.scanner_to_world() (from lego_robot.py) will return
+        #   the world coordinate, given the scanner pose and the coordinate in
+        #   the scanner's system.
+        m = LegoLogfile.scanner_to_world(scanner_pose,measurement_in_scanner_system)
+        # - H is obtained from dh_dlandmark()
+        H = self.dh_dlandmark(scanner_pose, m, scanner_displacement)
+        # - Use np.linalg.inv(A) to invert matrix A
+        H_inv = np.linalg.inv(H)
+        Qt = Qt_measurement_covariance
+        # - As usual, np.dot(A,B) is the matrix product of A and B.
+        # self.landmark_positions.append(np.array([0.0, 0.0]))  # Replace this.
+        # self.landmark_covariances.append(np.eye(2))  # Replace this.
+        self.landmark_positions.append(m)
+        self.landmark_covariances.append(np.dot(np.dot(H_inv,Qt),H_inv.T))
 
     def update_landmark(self, landmark_number, measurement,
                         Qt_measurement_covariance, scanner_displacement):
         """Update a landmark's estimated position and covariance."""
-        # --->>> Insert your previous code here.
-        pass  # Replace this.
+        # - H and Ql can be computed using
+        #   H_Ql_jacobian_and_measurement_covariance_for_landmark()
+        H, Ql = self.H_Ql_jacobian_and_measurement_covariance_for_landmark( landmark_number,Qt_measurement_covariance,scanner_displacement )
+        
+        # - Use np.linalg.inv(A) to compute the inverse of A
+        Ql_inv = np.linalg.inv(Ql)
+        
+        # - Delta z is measurement minus expected measurement
+        # - Expected measurement can be computed using
+        #   h_expected_measurement_for_landmark()
+        h = self.h_expected_measurement_for_landmark( landmark_number, scanner_displacement )
+        delta_z = measurement - h
+
+        # - Remember to update landmark_positions[landmark_number] as well
+        #   as landmark_covariances[landmark_number].
+        Sigma_old = self.landmark_covariances[landmark_number]
+        K = np.dot(np.dot(Sigma_old,H.T),Ql_inv)
+        KH = np.dot(K,H)
+        
+        self.landmark_positions[landmark_number] += np.dot(K, delta_z)
+        self.landmark_covariances[landmark_number] = np.dot((np.eye(KH.shape[0]) - KH), Sigma_old)
 
     def update_particle(self, measurement, measurement_in_scanner_system,
                         number_of_landmarks,
@@ -147,15 +193,16 @@ class Particle:
         
         # Compute likelihood of correspondence of measurement to all landmarks
         # (from 0 to number_of_landmarks-1).
-        likelihoods = [] # --->>> Replace this by
-                         # compute_correspondence_likelihoods().
+        likelihoods = self.compute_correspondence_likelihoods(measurement,number_of_landmarks,\
+            Qt_measurement_covariance,scanner_displacement)
 
         # If the likelihood list is empty, or the max correspondence likelihood
         # is still smaller than minimum_correspondence_likelihood, setup
         # a new landmark.
         if not likelihoods or\
            max(likelihoods) < minimum_correspondence_likelihood:
-            # --->>> Add code to insert a new landmark.
+            self.initialize_new_landmark(measurement_in_scanner_system,Qt_measurement_covariance,scanner_displacement)
+            #self.initialize_new_landmark(measurement,Qt_measurement_covariance,scanner_displacement)
             return minimum_correspondence_likelihood
 
         # Else update the particle's EKF for the corresponding particle.
@@ -164,8 +211,9 @@ class Particle:
 
             # --->>> Add code to find w, the maximum likelihood,
             # and the corresponding landmark index.
-            w, index = 0.001, 0  # Replace this by a search for max, argmax.
-            # Add code to update_landmark().
+            w = max(likelihoods)
+            index =  np.argmax(likelihoods) # Replace this by a search for max, argmax.
+            self.update_landmark(index,measurement,Qt_measurement_covariance, scanner_displacement)
             return w
 
 class FastSLAM:
@@ -286,6 +334,8 @@ if __name__ == '__main__':
     # This is the FastSLAM filter loop, with prediction and correction.
     f = open("fast_slam_correction.txt", "w")
     for i in xrange(len(logfile.motor_ticks)):
+        # if (i%10)==0:
+        #     print "Motor tick: ", i
         # Prediction.
         control = map(lambda x: x * ticks_to_mm, logfile.motor_ticks[i])
         fs.predict(control)
