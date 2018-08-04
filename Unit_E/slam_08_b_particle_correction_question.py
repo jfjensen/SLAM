@@ -153,8 +153,8 @@ class ParticleFilter:
         #return old_particles
 
 
-        new_particles = self.particles  # Replace this.
-        return new_particles
+        #new_particles = self.particles  # Replace this.
+        #return new_particles
 
     def correct(self, cylinders, landmarks):
         """The correction step of the particle filter."""
